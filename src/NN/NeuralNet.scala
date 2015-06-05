@@ -69,7 +69,8 @@ class NeuralNet(
   private var inputZeroMaskedFraction: Double,
   private var dropoutFraction: Double,
   private var testing: Double,
-  private var output_function: String) extends Serializable with Logging {
+  private var output_function: String,
+  private var initW: Array[BDM[Double]]) extends Serializable with Logging {
   //          var size=Array(5, 7, 1)
   //          var layer=3
   //          var activation_function="tanh_opt"
@@ -98,7 +99,7 @@ class NeuralNet(
    * testing = 0;                 Internal variable. nntest sets this to one.
    * output = 'sigm';             输出函数output unit 'sigm' (=logistic), 'softmax' and 'linear'   *
    */
-  def this() = this(NeuralNet.Architecture, 3, NeuralNet.Activation_Function, 2.0, 0.5, 1.0, 0.0, 0.0, 0.05, 0.0, 0.0, 0.0, NeuralNet.Output)
+  def this() = this(NeuralNet.Architecture, 3, NeuralNet.Activation_Function, 2.0, 0.5, 1.0, 0.0, 0.0, 0.05, 0.0, 0.0, 0.0, NeuralNet.Output, Array(BDM.zeros[Double](1, 1)))
 
   /** 设置神经网络结构. Default: [10, 5, 1]. */
   def setSize(size: Array[Int]): this.type = {
@@ -178,6 +179,12 @@ class NeuralNet(
     this
   }
 
+  /** 设置初始权重. Default: 0. */
+  def setInitW(initW: Array[BDM[Double]]): this.type = {
+    this.initW = initW
+    this
+  }
+
   /**
    * 运行神经网络算法.
    */
@@ -191,6 +198,11 @@ class NeuralNet(
       output_function)
     // 初始化权重
     var nn_W = NeuralNet.InitialWeight(size)
+    if (!((initW.length == 1) && (initW(0) == (BDM.zeros[Double](1, 1))))) {
+      for (i <- 0 to initW.length - 1) {
+        nn_W(i) = initW(i)
+      }
+    }
     var nn_vW = NeuralNet.InitialWeightV(size)
     //        val tmpw = nn_W(1)
     //        for (i <- 0 to tmpw.rows -1) {
@@ -742,7 +754,7 @@ object NeuralNet extends Serializable {
       val nn_a = f._1.nna
       val di = f._3
       val dropout = f._2
-      for (i <- bc_config.value.layer - 2 to 1) {
+      for (i <- (bc_config.value.layer - 2) to 1 by -1) {
         // f'(z)表达式
         val nnd_act = bc_config.value.activation_function match {
           case "sigm" =>
@@ -771,12 +783,12 @@ object NeuralNet extends Serializable {
         val W1 = bc_nn_W.value(i)
         val nndi1 = if (i + 1 == bc_config.value.layer - 1) {
           //in this case in d{n} there is not the bias term to be removed  
-          val di1 = di(i - 1)
+          val di1 = di(bc_config.value.layer - 2 - i)
           val di2 = (di1 * W1 + sparsityError) :* nnd_act
           di2
         } else {
           // in this case in d{i} the bias term has to be removed
-          val di1 = di(i - 1)(::, 1 to -1)
+          val di1 = di(bc_config.value.layer - 2 - i)(::, 1 to -1)
           val di2 = (di1 * W1 + sparsityError) :* nnd_act
           di2
         }
