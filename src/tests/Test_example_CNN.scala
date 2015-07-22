@@ -32,7 +32,7 @@ object Test_example_CNN {
 
     //2 ²âÊÔÊı¾İ
     Logger.getRootLogger.setLevel(Level.WARN)
-    val data_path = "user/huangmeiling/deeplearn/train_d.txt"
+    val data_path = "/user/huangmeiling/deeplearn/train_d.txt"
     val examples = sc.textFile(data_path).cache()
     val train_d1 = examples.map { line =>
       val f1 = line.split("\t")
