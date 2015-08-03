@@ -32,7 +32,7 @@ object Test_example_CNN {
 
     //2 测试数据
     Logger.getRootLogger.setLevel(Level.WARN)
-    val data_path = "/user/huangmeiling/deeplearn/train_d.txt"
+    val data_path = "/deeplearn/train_d3.txt"
     val examples = sc.textFile(data_path).cache()
     val train_d1 = examples.map { line =>
       val f1 = line.split("\t")
@@ -42,10 +42,10 @@ object Test_example_CNN {
       (new BDM(1, y.length, y), (new BDM(1, x.length, x)).reshape(28, 28) / 255.0)
     }
     val train_d = train_d1.map(f => (f._1, f._2))
-
+    
     //3 设置训练参数，建立模型
     // opts:迭代步长，迭代次数，交叉验证比例
-    val opts = Array(100.0, 1.0, 0.0)
+    val opts = Array(50.0, 1.0, 0.0)
     train_d.cache
     val numExamples = train_d.count()
     println(s"numExamples = $numExamples.")
@@ -58,18 +58,18 @@ object Test_example_CNN {
       setKernelsize(Array(0.0, 5.0, 0.0, 5.0, 0.0)).
       setScale(Array(0.0, 0.0, 2.0, 0.0, 2.0)).
       setAlpha(1.0).
-      setBatchsize(50.0).
-      setNumepochs(1.0).
       CNNtrain(train_d, opts)
 
     //4 模型测试
     val CNNforecast = CNNmodel.predict(train_d)
     val CNNerror = CNNmodel.Loss(CNNforecast)
     println(s"NNerror = $CNNerror.")
-    val printf1 = CNNforecast.map(f => (f.label.data(0), f.predict_label.data(0))).take(200)
-    println("预测结果——实际值：预测值：误差")
-    for (i <- 0 until printf1.length)
-      println(printf1(i)._1 + "\t" + printf1(i)._2 + "\t" + (printf1(i)._2 - printf1(i)._1))
+    val printf1 = CNNforecast.map(f => (f.label.data,  f.predict_label.data)).take(200)
+    println("预测值")
+    for (i <- 0 until printf1.length) {
+      val outi = printf1(i)._2.mkString("\t")
+      println(outi)
+    }
 
   }
 }

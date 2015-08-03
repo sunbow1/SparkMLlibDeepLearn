@@ -62,26 +62,22 @@ class CNN(
   private var outputmaps: Array[Double],
   private var kernelsize: Array[Double],
   private var scale: Array[Double],
-  private var alpha: Double,
-  private var batchsize: Double,
-  private var numepochs: Double) extends Serializable with Logging {
-//        var mapsize = new BDM(1, 2, Array(28.0, 28.0))
-//        var types = Array("i", "c", "s", "c", "s")
-//        var layer = 5
-//        var onum = 10  
-//        var outputmaps = Array(0.0, 6.0, 0.0, 12.0, 0.0)
-//        var kernelsize = Array(0.0, 5.0, 0.0, 5.0, 0.0)
-//        var scale = Array(0.0, 0.0, 2.0, 0.0, 2.0)
-//        var alpha = 1.0
-//        var batchsize = 50.0
-//        var numepochs = 1.0
+  private var alpha: Double) extends Serializable with Logging {
+//                var mapsize = new BDM(1, 2, Array(28.0, 28.0))
+//                var types = Array("i", "c", "s", "c", "s")
+//                var layer = 5
+//                var onum = 10  
+//                var outputmaps = Array(0.0, 6.0, 0.0, 12.0, 0.0)
+//                var kernelsize = Array(0.0, 5.0, 0.0, 5.0, 0.0)
+//                var scale = Array(0.0, 0.0, 2.0, 0.0, 2.0)
+//                var alpha = 1.0
 
   def this() = this(new BDM(1, 2, Array(28.0, 28.0)),
     Array("i", "c", "s", "c", "s"), 5, 10,
     Array(0.0, 6.0, 0.0, 12.0, 0.0),
     Array(0.0, 5.0, 0.0, 5.0, 0.0),
     Array(0.0, 0.0, 2.0, 0.0, 2.0),
-    1.0, 50.0, 1.0)
+    1.0)
 
   /** 设置输入层大小. Default: [28, 28]. */
   def setMapsize(mapsize: BDM[Double]): this.type = {
@@ -128,18 +124,6 @@ class CNN(
   /** 设置学习因子. Default: 1. */
   def setAlpha(alpha: Double): this.type = {
     this.alpha = alpha
-    this
-  }
-
-  /** 设置迭代大小. Default: 50. */
-  def setBatchsize(batchsize: Double): this.type = {
-    this.batchsize = batchsize
-    this
-  }
-
-  /** 设置迭代次数. Default: 1. */
-  def setNumepochs(numepochs: Double): this.type = {
-    this.numepochs = numepochs
     this
   }
 
@@ -337,12 +321,12 @@ object CNN extends Serializable {
   def convn(m0: BDM[Double], k0: BDM[Double], shape: String): BDM[Double] = {
     //val m0 = BDM((1.0, 1.0, 1.0, 1.0), (0.0, 0.0, 1.0, 1.0), (0.0, 1.0, 1.0, 0.0), (0.0, 1.0, 1.0, 0.0))
     //val k0 = BDM((1.0, 1.0), (0.0, 1.0))
-    //val m0 = BDM((1.0, 1.0, 1.0), (1.0, 1.0, 1.0), (1.0, 1.0, 1.0))
-    //val k0 = BDM((1.0, 2.0, 3.0), (4.0, 5.0, 6.0), (7.0, 8.0, 9.0))    
+    //val m0 = BDM((1.0, 5.0, 9.0), (3.0, 6.0, 12.0), (7.0, 2.0, 11.0))
+    //val k0 = BDM((1.0, 2.0, 0.0), (0.0, 5.0, 6.0), (7.0, 0.0, 9.0))    
     val out1 = shape match {
       case "valid" =>
         val m1 = m0
-        val k1 = k0.t
+        val k1 = Rot90(Rot90(k0))
         val row1 = m1.rows - k1.rows + 1
         val col1 = m1.cols - k1.cols + 1
         var m2 = BDM.zeros[Double](row1, col1)
@@ -456,6 +440,8 @@ object CNN extends Serializable {
       val nn_o = sigm(bc_cnn_ffW.value * nn_fv + bc_cnn_ffb.value)
       (lable, nn_a.toArray, nn_fv, nn_o)
     }
+    //val printf1 = train_data2.map(f => f._4.data).take(100)
+    //train_data2.map(f => f._2(4)(0)).take(1)
     train_data2
   }
 
@@ -494,6 +480,7 @@ object CNN extends Serializable {
       }
       (f._1, f._2, f._3, f._4, f._5, nn_od, nn_fvd)
     }
+  
     // reshape feature vector deltas into output map style
     val sa1 = train_data4.map(f => f._2(n - 1)(1)).take(1)(0).rows
     val sa2 = train_data4.map(f => f._2(n - 1)(1)).take(1)(0).cols
@@ -509,7 +496,7 @@ object CNN extends Serializable {
       val nnd1 = ArrayBuffer[BDM[Double]]()
       for (j <- 0 to nn_a(n - 1).length - 1) {
         val tmp1 = nn_fvd((j * fvnum) to ((j + 1) * fvnum - 1), 0)
-        val tmp2 = new BDM(sa1, sa2, tmp1.data)
+        val tmp2 = new BDM(sa1, sa2, tmp1.toArray)
         nnd1 += tmp2
       }
       nnd(n - 1) = nnd1.toArray
@@ -539,13 +526,22 @@ object CNN extends Serializable {
       }
       (f._1, f._2, f._3, f._4, f._5, f._6, f._7, nnd)
     }
+    // train_data5.map(f => f._8(4)(0)).take(1)     
+
     // dk db calc gradients
-    var cnn_layers = bc_cnn_layers.value
+    var layers = bc_cnn_layers.value
     for (l <- 1 to n - 1) {
       val type1 = bc_cnn_layers.value(l).types
       val lena1 = train_data5.map(f => f._2(l).length).take(1)(0)
       val lena2 = train_data5.map(f => f._2(l - 1).length).take(1)(0)
       if (type1 == "c") {
+        var nndk = new Array[Array[BDM[Double]]](lena2)
+        for (i <- 0 to lena2 - 1) {
+          for (j <- 0 to lena1 - 1) {
+            nndk(i) = new Array[BDM[Double]](lena1)
+          }
+        }
+        var nndb = new Array[Double](lena1)
         for (j <- 0 to lena1 - 1) {
           for (i <- 0 to lena2 - 1) {
             val rdd_dk_ij = train_data5.map { f =>
@@ -571,7 +567,7 @@ object CNN extends Serializable {
                 (m3, c1._2 + c2._2)
               })
             val dk = dk_ij / count_dk.toDouble
-            cnn_layers(l).dk(i)(j) = dk
+            nndk(i)(j) = dk
           }
           val rdd_db_j = train_data5.map { f =>
             val nn_d = f._8
@@ -581,8 +577,9 @@ object CNN extends Serializable {
           val db_j = rdd_db_j.reduce(_ + _)
           val count_db = rdd_db_j.count
           val db = db_j / count_db.toDouble
-          cnn_layers(l).db(j) = db
+          nndb(j) = db
         }
+        layers(l) = new CNNLayers(layers(l).types, layers(l).outputmaps, layers(l).kernelsize, layers(l).scale, layers(l).k, layers(l).b, nndk, nndb)
       }
     }
 
@@ -629,7 +626,7 @@ object CNN extends Serializable {
         (m3, c1._2 + c2._2)
       })
     val cnn_dffb = ffb2 / countfffb2.toDouble
-    (train_data5, cnn_dffw, cnn_dffb, cnn_layers)
+    (train_data5, cnn_dffw, cnn_dffb, layers)
   }
 
   /**
@@ -644,27 +641,27 @@ object CNN extends Serializable {
     val train_data5 = train_cnnbp._1
     val cnn_dffw = train_cnnbp._2
     val cnn_dffb = train_cnnbp._3
-    var cnn_layers = train_cnnbp._4
-    var cnn_ffb = bc_cnn_ffb.value
-    var cnn_ffW = bc_cnn_ffW.value
-    val n = cnn_layers.length
+    var cnn_layers2 = train_cnnbp._4
+    var cnn_ffb2 = bc_cnn_ffb.value
+    var cnn_ffW2 = bc_cnn_ffW.value
+    val n = cnn_layers2.length
 
     for (l <- 1 to n - 1) {
-      val type1 = cnn_layers(l).types
+      val type1 = cnn_layers2(l).types
       val lena1 = train_data5.map(f => f._2(l).length).take(1)(0)
       val lena2 = train_data5.map(f => f._2(l - 1).length).take(1)(0)
       if (type1 == "c") {
         for (j <- 0 to lena1 - 1) {
           for (ii <- 0 to lena2 - 1) {
-            cnn_layers(l).k(ii)(j) = cnn_layers(l).k(ii)(j) - cnn_layers(l).dk(ii)(j)
+            cnn_layers2(l).k(ii)(j) = cnn_layers2(l).k(ii)(j) - cnn_layers2(l).dk(ii)(j) * alpha
           }
-          cnn_layers(l).b(j) = cnn_layers(l).b(j) - cnn_layers(l).db(j)
+          cnn_layers2(l).b(j) = cnn_layers2(l).b(j) - cnn_layers2(l).db(j) * alpha
         }
       }
     }
-    cnn_ffW = cnn_ffW + cnn_dffw
-    cnn_ffb = cnn_ffb + cnn_dffb
-    (cnn_ffW, cnn_ffb, cnn_layers)
+    cnn_ffW2 = cnn_ffW2 - cnn_dffw * alpha
+    cnn_ffb2 = cnn_ffb2 - cnn_dffb * alpha
+    (cnn_ffW2, cnn_ffb2, cnn_layers2)
   }
 
   /**
